@@ -11,9 +11,11 @@ print(flag2, type(flag2).__name__)
 
 # 8093454
 """
-from math import trunc
+from functools import reduce
 
-from listGuide import list1
+from fontTools.misc.cython import returns
+
+from offline.tuple import result
 
 """qwd
 qwwwww"""
@@ -178,3 +180,98 @@ def customSum(a, b=0):
 result, ok = customSum(7)
 print(result)
 print(ok)"""
+list1 = [1, 2]
+"""
+from functools import *
+
+print(reduce(lambda x, y: x + y, [1, 2, 3, 4]))
+print(reduce(lambda x, y: x * y, [1, 2, 3, 4]))
+print(reduce(lambda x, y: x + y, ['1', '2', '3', '4']))
+
+"""
+"""собрать все оценки всеъ студентов в один список
+средний балл по всем """
+"""
+
+students = [
+    {'name': 'matvey', 'age': 23, 'grades': [1, 2, 3, 4]},
+    {'name': 'matvey', 'age': 23, 'grades': [1, 2, 3, 4]},
+    {'name': 'matvey', 'age': 23, 'grades': [1, 2, 3, 4]},
+    {'name': 'matvey', 'age': 23, 'grades': [1, 2, 3, 4]},
+    {'name': 'matvey', 'age': 23, 'grades': [1, 2, 3, 4]},
+]
+# reduce собрать все оценки в один список
+# reduce найти средний балл
+#all_grades = reduce(lambda acc, student: acc + student['grades'], students, [])
+all_grades = [grade for student 
+              in students for grade in student['grades']]
+all_grades = []
+for student in students:
+    for grade in student['grades']:
+        all_grades.append(grade)
+total_sum = 0
+total_len = 0
+for student in students:
+    total_len += len(student["grades"])
+    total_sum += sum(student["grades"])
+
+print(all_grades)
+for i, e in enumerate(list(range(4, 10))):
+    print(i, e)"""
+"""list1 = [1, 2, 3]
+list2 = [1, 2, 3]
+zipped = zip(list1, list2)
+print(list(zipped))
+list4, list5 = zip(*zipped)
+
+list1 = [1, 2, 3]
+list2 = [1, 2, 3, 4, 5]
+zipped = zip(list1, list2)
+print(list(zipped))
+print(list(zip(*zipped)))
+
+list1 = [1, 2, 3]
+list2 = [1, 2, 3, 4, 5]
+list3 = [1, 2, 3, 4, 5, 6, 7]
+zipped = zip(list1, list2, list3)
+print(list(zipped))
+print(list(zip(*zipped)))"""
+"""
+объеденить чтобы по студенту, для каждого
+были доступны имя возраст оценки
+найти средний балл по всем
+с самым высоким
+"""
+"""students = [('alice', 20), ('alice', 20), ('alice', 20)]
+grades  = [[1, 2, 3], [1, 2, 3], [1, 2, 4]]"""
+"""
+'alice', 20, [1, 2, 3], 2
+'alice', 20, [1, 2, 3], 2
+'alice', 20, [1, 2, 4], 2.33
+
+'alice', 20, [1, 2, 4], 2.33
+
+2.11
+"""
+"""from functools import reduce
+
+students = [('alice', 20), ('alice', 20), ('alice', 20)]
+grades = [[1, 2, 3], [1, 2, 3], [1, 2, 4]]
+
+combined_data = list(zip(students, grades))
+print(combined_data)
+student_averages = []
+
+for (name, age), student_grades in combined_data:
+    average_grade = sum(student_grades) / len(student_grades)
+    student_averages.append((name, age, student_grades, average_grade))
+    print(f"'{name}', {age}, {student_grades}, {average_grade:.2f}")
+
+#all_grades = [grade for student_grades in grades for grade in student_grades]
+all_grades = reduce(lambda acc, student_grades: acc + student_grades, grades, [])
+overall_average = sum(all_grades) / len(all_grades)
+
+best_student = max(student_averages, key=lambda x: x[3])
+
+print(round(overall_average, 2))
+print(best_student[0], best_student[1], best_student[2], round(best_student[3], 2))"""
