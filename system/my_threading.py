@@ -20,7 +20,12 @@ starvation голодание
 синхронизация потоков:
 Lock - примитив синхронизации для управления доступом к общим ресурсам
 Rlock, Semaphore, Condition, Event - для координации работы потоков
-Queue - потокобезная очередь для обмена данными между потоками
+queue.Queue - потокобезная очередь для обмена данными между потоками
+    put(item, block=True, timeout=None) - добавить элемент в очередь
+    get(block=True, timeout=None) - получить элемент из очереди
+    task_done() - сообщает очереди, что текущая задача выполнена
+    join() - ожидание завершения всех потоков
+    empty(), full(), qsize() - информация об очереди. Небезопасны
 
 Thread - класс, реализующий поток исполнения кода
     передать целевую функцию через параметр target=
@@ -38,7 +43,14 @@ Thread - класс, реализующий поток исполнения ко
         Работает = .run()
         Завершен 
 
-ThreadPool
+from concurrent.futures import ThreadPoolExecutor
+    ThreadPool - многопоточная очередь задач
+
+ProcessPoolExecutor - многопроцессорная очередь задач CPU
+
+Barrier - синхронизация потоков, когда все потоки должны дождаться друг друга
+    wait(timeout=None) - ожидание завершения всех потоков
+    BrokenBarrierError - исключение, когда все потоки не успели дождаться друг друга
 
 Lock
     lock.acquire(blocking=True, timeout=-1) - захватить блокировку, если она свободна
@@ -62,8 +74,11 @@ Event - сигнализация между потоками
     .wait() - ожидание сигнала. Блокируется поток до тех пор, пока сигнал не будет установлен
     .set() - установка сигнала. Разблокирует все ожидающие потоки
     .clear() - сброс сигнала. Потоки снова будут заблокированы
+    .is_set() - проверка состояния сигнала
 
 Condition - расширенный механизм ожидания
+    wait() - ожидание сигнала. Блокируется поток до тех пор, пока сигнал не будет установлен
+    notify() / notify_all() - уведомление ожидающих потоков
 
 Timer - запуск потока через заданный интервал времени
 
@@ -198,8 +213,8 @@ threads = [Thread(target=worker, args=(i, )) for i in range(5)]
 [t.start() for t in threads]
 [t.join() for t in threads]
 
-"""from threading import BoundedSemaphore
-
+from threading import BoundedSemaphore
+"""
 sema = BoundedSemaphore(2)
 sema.acquire()
 sema.release()
@@ -224,16 +239,396 @@ threads = [Thread(target=download_file, args=(i, )) for i in range(10)]
 """
 1 параллельная печать с блокировкой
 5 потоков, печатают от 1 до 3. Поток в критичческой секции, защищен Lock
+"""
+lock = Lock()
+def print_numbers(name):
+    for i in range(1, 4):
+        with lock:
+            print(f"поток {name}: {i}")
+        time.sleep(0.2)
 
+threads = []
+
+for i in range(5):
+    t = Thread(target=print_numbers, args=(f"поток-{i}", ))
+    threads.append(t)
+    t.start()
+
+for t in threads:
+    t.join()
+
+"""
 2 рекурсивная блокировка
 поток, вызывает функцию внутри функции (рекурсивный вызов). обе используют одну и ту же блокировку
+"""
+rlock = RLock()
 
+def inner():
+    with rlock:
+        print('внутренняя функция')
+
+def outer():
+    with rlock:
+        print('внешняя функция')
+        inner()
+
+t = Thread(target=outer)
+t.start()
+t.join()
+"""
 3 ограничение количества одновременных подключений
 запустите 10 потоков, работают по 2 секу. Не более 3 потоков одновременно
+"""
+sem = Semaphore(3)
+def worker(n):
+    with sem:
+        print(f"поток {n} захватил ресурс")
+        time.sleep(2)
+        print(f"поток {n} освободил ресурс")
 
+threads = []
+for i in range(10):
+    t = Thread(target=worker, args=(i,))
+    threads.append(t)
+    t.start()
+
+[t.join() for t in threads]
+
+"""
 4 контроль использования ресурса
 создать BoundedSemaphore(2), попробовать вызвать release() больше чем acquire() раз. Обработка ошибок
+"""
+sem = BoundedSemaphore(2)
 
+sem.acquire()
+sem.acquire()
+try:
+    sem.release()
+    sem.release()
+    sem.release()
+except ValueError as e:
+    print(f'ошибка {e}')
+
+"""
 5 сравнение Lock и Semaphore
 сделать принтер. использовать с lock, semaphore3
+"""
+printer_lock = Lock()
+printer_sem = Semaphore(3)
+
+def lock_user(n):
+    with printer_lock:
+        print(f"[Lock] Поток {n} использует принтер")
+        time.sleep(1)
+
+def sem_user(n):
+    with printer_sem:
+        print(f"[Semaphore] Поток {n} использует принтер")
+        time.sleep(1)
+
+print('Запуск потоков с Lock')
+threads = [Thread(target=lock_user, args=(i, )) for i in range(5)]
+for t in threads: t.start()
+for t in threads: t.join()
+
+print('Запуск потоков с Semaphore')
+threads = [Thread(target=sem_user, args=(i, )) for i in range(5)]
+for t in threads: t.start()
+for t in threads: t.join()
+
+from threading import Condition
+
+condition = Condition
+
+with condition:
+    condition.wait()
+
+with condition:
+    condition.notify()
+    
+#while not <condition>: condition.wait()
+
+from threading import Event
+event = Event()
+event.set()
+event.clear()
+if event.is_set():
+    print("можно продолжить")
+event.wait(timeout=None)
+
+
+event = Event()
+
+def worker():
+    print("поток ожидает события")
+    event.wait()
+    print("поток получил событие")
+
+t = Thread(target=worker)
+t.start
+
+time.sleep(2)
+print("посылаю сигнал")
+event.set()
+
+t.join()
+
+
+event = Event()
+
+def ready_worker(i):
+    print(f"поток {i} ждет запуска")
+    event.wait()
+    print(f"поток {i} стартует")
+
+threads = [Thread(target=ready_worker, args=(i, )) for i in range(5)]
+for t in threads: t.start()
+
+time.sleep(2)
+print("стартуем все потоки")
+event.set()
+
+from queue import Queue
+q = Queue()
+q = Queue(maxsize=10) # ограничение на кол-во элементов в очереди
+
+
+def producer(q):
+    for i in range(5):
+        print("производитель отправляет данные")
+        q.put(i)
+        time.sleep(1)
+
+def consumer(q):
+    while True:
+        item = q.get()
+        print(f"получено: {item}")
+        q.task_done()
+
+q = Queue()
+t1 = Thread(target=producer, args=(q,))
+t2 = Thread(target=consumer, args=(q,))
+t1.start()
+t2.start()
+t1.join()
+q.join()
+
+q = Queue(maxsize=3)
+
+def producer():
+    for i in range(5):
+        print("производитель отправляет данные")
+        q.put(i)
+        print(f"{i} отправлен")
+
+def consumer():
+    while True:
+        item = q.get()
+        print(f"получено: {item}")
+        time.sleep(2)
+        q.task_done()
+
+Thread(target=producer).start()
+Thread(target=consumer, deamon=True).start()
+
+q = Queue()
+
+def producer():
+    for i in range(5):
+        q.put(f"data {i}")
+
+def consumer():
+    while True:
+        item = q.get()
+        print(f"получено: {item}")
+        q.task_done()
+
+for _ in range(2):
+    Thread(target=consumer).start()
+
+for _ in range(3):
+    Thread(target=producer, deamon=True).start()
+
+
+"""
+t = Timer(interval, function, args=None, kwargs=None)
+interval - время задержки в секундах
+function - функция, которую нужно запустить
+args - аргументы для функции список
+kwargs - аргументы для функции словарь
+
+t.start()
+t.cancel()
+"""
+
+from threading import Timer
+
+def say_hello():
+    print('таймер сработал')
+
+t = Timer(3, say_hello)
+t.start()
+
+def print_msg(msg):
+    print(f"[{time.strftime('%X')}] {msg}")
+
+print(f"[{time.strftime('%X')}] старт")
+t = Timer(3, print_msg, args=("сообщение через 3 секунды",))
+t.start()
+print(f"[{time.strftime('%X')}] основной поток работает дальше")
+
+def repeat():
+    print(f"сейчас {time.strftime('%X')}")
+    t = Timer(2, repeat)
+    t.start()
+
+repeat()
+
+def timeout():
+    print("время вышло")
+
+t = Timer(2, timeout)
+t.start()
+
+anwer = input("введите ответ за 2 с: ")
+t.cancel()
+print(f"ответ: {answer}")
+
+counter = 0
+lock = Lock()
+
+def increase():
+    global counter
+    with lock:
+        counter += 1
+        print(f"счетчик: {counter}")
+
+t = Timer(2, increase)
+t.start()
+t.join()
+
+from concurrent.futures import ThreadPoolExecutor
+
+executor = ThreadPoolExecutor(max_workers=5)
+
+# 1 submit(fn, *args, **kwargs) - отправить задачу на выполнение
+future = executor.submit(my_func, arg1, arg2)
+
+result = future.result()
+"""
+Future
+future.done() - проверяет завершена ли задача
+future.result() - возвращает результат выполнения задачи
+future.exception() - возвращает исключение, если оно было
+future.add_done_callback(fn) - добавить функцию, которая будет вызвана после завершения задачи
+"""
+# 2 map(fn, *iterables) - выполнить функцию на нескольких элементах
+
+results = executor.map(my_func, list_of_args)
+
+
+def task(n):
+    time.sleep(1)
+    return n * 2
+
+with ThreadPoolExecutor(max_workers=3) as executor:
+    results = executor.map(task, range(5))
+
+# без with 
+# executor.shutdown(wait=True)
+ 
+for r in results:
+    print(r)
+
+futures = []
+
+for i in range(10):
+    futures.append(executor.submit(my_func, i))
+
+for f in futures:
+    print(f.result())
+
+
+def download(url):
+    print(f"Скачиваем {url}")
+    resp = requests.get(url)
+    return len(resp.content)
+
+urls = [
+    "https://www.python.org",
+    "https://www.google.com",
+    "https://www.yandex.ru"
+]
+
+with ThreadPoolExecutor(max_workers=3) as executor:
+    results = executor.map(download, urls)
+
+for size in results:
+    print(f"размер ответа: {size}")
+
+
+def worker(q):
+    while not q.empty():
+        item = q.get()
+        print(f"получено: {item}")
+        q.task_done()
+
+q = Queue()
+for i in range(20):
+    q.put(i)
+
+with ThreadPoolExecutor(max_workers=4) as executor:
+    for _ in range(4):
+        executor.submit(worker, q)
+
+from threading import Barrier
+
+barrier = Barrier(parties=3, timeout=3)
+# barrier.broken
+def worker():
+    print("До барьера")
+    barrier.wait()
+    print("После барьера")
+
+def worker():
+    for phase in range(5):
+        print(f"Поток {threadid.current_thread().name} в фазе {phase}")
+        barrier.wait()
+
+i = barrier.wait(timeout=3)
+if i == 0:
+    print("я последний и главный поток, начинаю финальную фазу")
+
+
+barrier = Barrier(parties=3, timeout=3)
+
+def worker(n):
+    print(f"Поток {n} работа до барьера")
+    time.sleep(n)
+    print(f"Поток {n} подошел к барьеру")
+    barrier.wait()
+    print(f"Поток {n} продолжил выполнение")
+
+threads = []
+
+for i in range(3):
+    t = Thread(target=worker, args=(i,))
+    threads.append(t)
+    t.start()
+
+for t in threads:
+    t.join()
+
+
+"""
+from queue import Queue
+многопоточная обработка заданий из очереди 
+producer - добавляет элементы в очередь
+    task-1
+    task-2
+    task-N
+
+несколько consumers - берут элементы из очереди и обрабатывают time.sleep(1)
+основной поток ждет
+завершение по сигналу (None/STOP)
 """
